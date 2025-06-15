@@ -1,0 +1,12 @@
+<!-- templates/chapter.html -->
+<!doctype html>
+<title>{{ book_name }} {{ chapter_num }}</title>
+<h1>{{ book_name }} {{ chapter_num }}</h1>
+<ol>
+  {% for verse, text in verses %}
+    <li><strong>{{ verse }}</strong>&nbsp;{{ text }}</li>
+  {% endfor %}
+</ol>
+<a href="{{ url_for('show_book', book_id=request.view_args['book_id']) }}">
+  Back to Chapters
+</a>

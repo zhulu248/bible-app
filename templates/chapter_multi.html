@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>{{ book_name }} – Chapter {{ chapter }}</title>
+<style>
+  body { font-family: sans-serif; margin:20px; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { border:1px solid #ccc; padding:6px; vertical-align:top; }
+  th { background:#f0f0f0; }
+</style>
+</head>
+<body>
+
+<h1>{{ book_name }} – Chapter {{ chapter }}</h1>
+
+<table>
+  <tr><th>Verse</th>{% for v in selected %}<th>{{ v }}</th>{% endfor %}</tr>
+  {% for i in range(verse_count) %}
+    <tr>
+      <td>{{ verses[i] }}</td>
+      {% for v in selected %}<td>{{ verses_data[v][i][1] }}</td>{% endfor %}
+    </tr>
+  {% endfor %}
+</table>
+
+<p><a href="/">← Back to Books</a></p>
+</body>
+</html>
