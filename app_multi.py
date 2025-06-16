@@ -4,8 +4,10 @@ from pathlib import Path
 
 app = Flask(__name__)
 BASE_DIR = Path(__file__).resolve().parent
-DATABASE = BASE_DIR / "kjv.db"
+DATABASE = BASE_DIR / "KJV.db"
 NOTES_DB = BASE_DIR / "notes.db"
+
+
 
 AVAILABLE_VERSIONS = [
     ("KJV", "King James Version"),
