@@ -10,7 +10,41 @@
         th { background: #f0f7ff; }
         tr:nth-child(even) { background: #f9f9f9; }
         .back { margin-bottom: 20px; }
+        .edit-note-btn { color: #337ab7; cursor: pointer; text-decoration: underline; }
+        .note-form { display: none; }
     </style>
+    <script>
+        function editNote(verse) {
+            document.getElementById('note-form-' + verse).style.display = '';
+            document.getElementById('note-text-' + verse).style.display = 'none';
+            document.getElementById('edit-btn-' + verse).style.display = 'none';
+        }
+        function saveNote(book_id, chapter, verse) {
+            let noteInput = document.getElementById('note-input-' + verse);
+            fetch("/save_note", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({
+                    book_id: book_id,
+                    chapter: chapter,
+                    verse: verse,
+                    note: noteInput.value
+                })
+            }).then(r => r.json()).then(data => {
+                if (data.success) {
+                    document.getElementById('note-text-' + verse).innerText = noteInput.value;
+                    document.getElementById('note-form-' + verse).style.display = 'none';
+                    document.getElementById('note-text-' + verse).style.display = '';
+                    document.getElementById('edit-btn-' + verse).style.display = '';
+                }
+            });
+        }
+        function cancelEdit(verse) {
+            document.getElementById('note-form-' + verse).style.display = 'none';
+            document.getElementById('note-text-' + verse).style.display = '';
+            document.getElementById('edit-btn-' + verse).style.display = '';
+        }
+    </script>
 </head>
 <body>
     <h2>{{ book_name }} Chapter {{ chapter_num }}</h2>
@@ -20,6 +54,7 @@
             {% for v in versions %}
                 <th>{{ v }}</th>
             {% endfor %}
+            <th>Note</th>
         </tr>
         {% for verse_row in verses_data %}
         <tr>
@@ -29,6 +64,15 @@
                     {{ verse_row[v] if verse_row[v] else "&mdash;" }}
                 </td>
             {% endfor %}
+            <td>
+                <span id="note-text-{{ verse_row.verse }}">{{ verse_row.note }}</span>
+                <span id="edit-btn-{{ verse_row.verse }}" class="edit-note-btn" onclick="editNote({{ verse_row.verse }})">Edit</span>
+                <span id="note-form-{{ verse_row.verse }}" class="note-form">
+                    <input type="text" id="note-input-{{ verse_row.verse }}" value="{{ verse_row.note|e }}" size="40">
+                    <button type="button" onclick="saveNote({{ book_id }}, {{ chapter_num }}, {{ verse_row.verse }})">Save</button>
+                    <button type="button" onclick="cancelEdit({{ verse_row.verse }})">Cancel</button>
+                </span>
+            </td>
         </tr>
         {% endfor %}
     </table>

@@ -1,10 +1,11 @@
-from flask import Flask, render_template, g, request, url_for, redirect
+from flask import Flask, render_template, g, request, jsonify
 import sqlite3
 from pathlib import Path
 
 app = Flask(__name__)
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE = BASE_DIR / "kjv.db"
+NOTES_DB = BASE_DIR / "notes.db"
 
 AVAILABLE_VERSIONS = [
     ("KJV", "King James Version"),
@@ -19,11 +20,20 @@ def get_db():
         db = g._database = sqlite3.connect(DATABASE)
     return db
 
+def get_notes_db():
+    db = getattr(g, "_notes_db", None)
+    if db is None:
+        db = g._notes_db = sqlite3.connect(NOTES_DB)
+    return db
+
 @app.teardown_appcontext
-def close_connection(exception):
+def close_connections(exception):
     db = getattr(g, "_database", None)
     if db is not None:
         db.close()
+    notes_db = getattr(g, "_notes_db", None)
+    if notes_db is not None:
+        notes_db.close()
 
 @app.route("/", methods=["GET"])
 def index():
@@ -31,7 +41,7 @@ def index():
     cur.execute("SELECT id, name FROM KJV_books")
     books_raw = cur.fetchall()
 
-    # get chapter count for each book
+    # Get chapter count for each book
     cur.execute("SELECT book_id, MAX(chapter) FROM verses GROUP BY book_id")
     chapter_counts = {book_id: max_chapter for book_id, max_chapter in cur.fetchall()}
 
@@ -56,7 +66,6 @@ def show_chapter(book_id, chapter_num):
     cur.execute("SELECT name FROM KJV_books WHERE id = ?", (book_id,))
     book_name = cur.fetchone()[0]
 
-    # Get versions from query, default if not provided
     versions = request.args.getlist("version")
     if not versions:
         versions = ["KJV", "CUV_SIM"]
@@ -70,19 +79,26 @@ def show_chapter(book_id, chapter_num):
         """, (book_id, chapter_num, v))
         version_texts[v] = cur.fetchall()
 
-    # Use verse numbers from KJV if present, else any version
     base_version = "KJV" if "KJV" in version_texts and version_texts["KJV"] else next(iter(version_texts))
     verse_numbers = [row[0] for row in version_texts[base_version]]
 
-    # Build list of rows for template
+    # Fetch notes for these verses
+    notes_db = get_notes_db()
+    notes_cur = notes_db.cursor()
+    notes_cur.execute("""
+        SELECT verse, note FROM notes
+        WHERE book_id = ? AND chapter = ?
+    """, (book_id, chapter_num))
+    notes_map = {row[0]: row[1] for row in notes_cur.fetchall()}
+
     verses_data = []
     for idx, verse_num in enumerate(verse_numbers):
         verse_row = {"verse": verse_num}
         for v in versions:
             verse_row[v] = version_texts[v][idx][1] if idx < len(version_texts[v]) else ""
+        verse_row["note"] = notes_map.get(verse_num, "")
         verses_data.append(verse_row)
 
-    # To pass selected versions back to the book page
     version_query = [("version", v) for v in versions]
 
     return render_template("chapter_multi.html",
@@ -92,6 +108,24 @@ def show_chapter(book_id, chapter_num):
                            verses_data=verses_data,
                            book_id=book_id,
                            version_query=version_query)
+
+@app.route("/save_note", methods=["POST"])
+def save_note():
+    data = request.get_json()
+    book_id = data["book_id"]
+    chapter = data["chapter"]
+    verse = data["verse"]
+    note = data["note"]
+
+    db = get_notes_db()
+    c = db.cursor()
+    c.execute("""
+        INSERT INTO notes (book_id, chapter, verse, note)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(book_id, chapter, verse) DO UPDATE SET note=excluded.note
+    """, (book_id, chapter, verse, note))
+    db.commit()
+    return jsonify(success=True)
 
 if __name__ == "__main__":
     app.run(debug=True)
