@@ -19,3 +19,24 @@ SELECT * FROM <verses_table> WHERE book_id = 1 AND chapter = 1 AND verse = 1;
 06/14/2025  12:51 PM         4,743,168 Darby.db
 06/14/2025  08:14 AM         4,751,360 KJV.db
 06/14/2025  12:51 PM         4,829,184 YLT.db
+
+set FLASK_APP=app_multi.py
+flask run
+
+git remote add origin https://github.com/yourusername/bible-app.git
+git push -u origin maincmd
+
+git remote add origin https://github.com/zhulu248/bible-app.git
+
+
+https://github.com/zhulu248/bible-app.git
+
+C:\Users\zhulu\AppData\Local\Programs\Python\Python313>
+
+
+
+KJV_books     KJV_verses    translations  verses
+PRAGMA table_info(KJV_books);
+PRAGMA table_info(KJV_verses);
+PRAGMA table_info(translations);
+PRAGMA table_info(verses);

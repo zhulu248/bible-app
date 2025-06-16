@@ -1,75 +1,65 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Bible Reader – Books & Chapters</title>
-<style>
-  body { margin: 0; font-family: sans-serif; }
-  #sidebar {
-    position: fixed; top: 0; left: 0; width: 200px; height: 100vh;
-    background: #f7f7f7; border-right: 1px solid #ccc; padding: 10px;
-    overflow-y: auto;
-  }
-  #sidebar a { display: block; margin-bottom: 5px; text-decoration: none; color: #333; }
-  #sidebar a:hover { text-decoration: underline; }
-  #main { margin-left: 220px; padding: 20px; }
-  .version-box { margin-bottom: 20px; }
-  .book-section { margin-bottom: 60px; }
-  .book-title { font-size: 1.5em; margin-top: 40px; }
-  .chapters {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(40px,1fr));
-    gap:5px;
-    max-width: 800px;
-  }
-  .chapters button {
-    padding:5px; background:#eef; border:none; border-radius:3px; cursor:pointer;
-  }
-  .chapters button:hover { background:#cce; }
-</style>
+    <meta charset="UTF-8">
+    <title>Bible Books and Chapters</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; }
+        .sidebar {
+            position: fixed; left: 0; top: 0; width: 200px; height: 100vh;
+            background: #f7f7f7; border-right: 1px solid #ddd; padding: 15px; overflow-y: auto;
+        }
+        .sidebar strong { display: block; margin-bottom: 10px; }
+        .sidebar a { display: block; color: #003366; text-decoration: none; margin-bottom: 4px; }
+        .sidebar a:hover { background: #d6e9ff; }
+        .main-content { margin-left: 220px; padding: 30px 40px; }
+        h2 { margin-top: 50px; }
+        .chapter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(36px, 1fr));
+            gap: 6px;
+            margin-bottom: 30px;
+        }
+        .chapter-cell {
+            display: block; padding: 8px 0;
+            text-align: center; background: #eee; border-radius: 4px;
+            color: #333; text-decoration: none; font-weight: bold;
+        }
+        .chapter-cell:hover { background: #9ecfff; color: #00285a; }
+        form.version-selector { margin-bottom: 32px; }
+    </style>
 </head>
 <body>
-
-<div id="sidebar">
-  <h3>Jump to Book</h3>
-  {% for id, name in books %}
-    <a href="#book-{{ id }}">{{ name }}</a>
-  {% endfor %}
-</div>
-
-<div id="main">
-  <form id="selectForm" class="version-box">
-    <strong>Select up to 2 versions:</strong><br>
-    {% for code,label in versions %}
-      <label>
-        <input type="checkbox" name="version" value="{{ code }}"
-          {% if code in selected %}checked{% endif %}>
-        {{ label }}
-      </label><br>
+<div class="sidebar">
+    <strong>Books</strong>
+    {% for book in books %}
+        <a href="#book-{{ book.id }}">{{ book.name }}</a>
     {% endfor %}
-  </form>
-
-  {% for id, name in books %}
-    <div id="book-{{ id }}" class="book-section">
-      <div class="book-title">{{ name }}</div>
-      <div class="chapters">
-        {% for ch in range(1, 151) %}
-          <button type="button"
-                  onclick="openChapter({{ id }},{{ ch }})">{{ ch }}</button>
-        {% endfor %}
-      </div>
-    </div>
-  {% endfor %}
 </div>
-
-<script>
-function openChapter(bookId, ch) {
-  const vers = Array.from(document.querySelectorAll('input[name="version"]:checked'))
-                     .map(cb => 'version=' + encodeURIComponent(cb.value))
-                     .join('&');
-  location.href = `/chapter?book_id=${bookId}&chapter=${ch}&${vers}`;
-}
-</script>
-
+<div class="main-content">
+    <form method="get" class="version-selector">
+        <label><strong>Select up to 2 Versions:</strong></label><br>
+        {% for code, name in available_versions %}
+            <label>
+                <input type="checkbox" name="version" value="{{ code }}"
+                    {% if code in selected_versions %}checked{% endif %}
+                    {% if selected_versions|length >= 2 and code not in selected_versions %}disabled{% endif %}>
+                {{ name }}
+            </label>
+        {% endfor %}
+        <button type="submit" style="margin-left:20px;">Apply</button>
+    </form>
+    {% for book in books %}
+        <h2 id="book-{{ book.id }}">{{ book.name }}</h2>
+        <div class="chapter-grid">
+            {% for chapter in book.chapters %}
+                <a class="chapter-cell"
+                   href="{{ url_for('show_chapter', book_id=book.id, chapter_num=chapter, **{'version': selected_versions}) }}">
+                    {{ chapter }}
+                </a>
+            {% endfor %}
+        </div>
+    {% endfor %}
+</div>
 </body>
 </html>
