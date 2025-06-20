@@ -2,11 +2,25 @@
 <html>
 <head>
     <title>{{ book_name }} Chapter {{ chapter_num }}</title>
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
     <style>
         .verse-table { border-collapse: collapse; width: 100%; }
         .verse-table th, .verse-table td { border: 1px solid #bbb; padding: 6px; }
         .verse-table th { background: #eee; }
         .edit-link { color: blue; cursor: pointer; text-decoration: underline; }
+        #noteModal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.2);
+            z-index: 10;
+            align-items: center;
+            justify-content: center;
+        }
+        #noteModal .modal-content {
+            background: white; padding: 20px; border-radius: 8px;
+            min-width: 400px; min-height: 200px;
+        }
     </style>
 </head>
 <body>
@@ -30,50 +44,77 @@
                 <td>{{ row[v] }}</td>
                 {% endfor %}
                 <td>
-                    <span id="note-text-{{ row.verse }}">{{ row.note }}</span>
-                    <span id="edit-btn-{{ row.verse }}" class="edit-link" onclick="editNote({{ row.verse }})">Edit</span>
-                    <span id="note-form-{{ row.verse }}" style="display:none;">
-                        <input type="text" id="note-input-{{ row.verse }}" value="{{ row.note|e }}" size="40">
-                        <button type="button" onclick="saveNote({{ book_id }}, {{ chapter_num }}, {{ row.verse }})">Save</button>
-                        <button type="button" onclick="cancelEdit({{ row.verse }})">Cancel</button>
-                    </span>
+                    <span id="note-text-{{ row.verse }}">{% if row.note %}{{ row.note|safe }}{% endif %}</span>
+                    <span class="edit-link" onclick="openModal({{ book_id }}, {{ chapter_num }}, {{ row.verse }})">Edit</span>
                 </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 
-<script>
-function editNote(verse) {
-    document.getElementById('note-form-' + verse).style.display = '';
-    document.getElementById('note-text-' + verse).style.display = 'none';
-    document.getElementById('edit-btn-' + verse).style.display = 'none';
-}
-function saveNote(book_id, chapter, verse) {
-    let noteInput = document.getElementById('note-input-' + verse);
-    fetch("/save_note", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({
-            book_id: book_id,
-            chapter: chapter,
-            verse: verse,
-            note: noteInput.value
-        })
-    }).then(r => r.json()).then(data => {
-        if (data.success) {
-            document.getElementById('note-text-' + verse).innerText = noteInput.value;
-            document.getElementById('note-form-' + verse).style.display = 'none';
-            document.getElementById('note-text-' + verse).style.display = '';
-            document.getElementById('edit-btn-' + verse).style.display = '';
+    <!-- Modal for editing notes -->
+    <div id="noteModal">
+        <div class="modal-content">
+            <h3>Edit Note</h3>
+            <div id="editor-container" style="height:200px;"></div>
+            <div style="margin-top:15px;">
+                <button onclick="saveModalNote()">Save</button>
+                <button onclick="closeModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+    <script>
+    let currentBook = null, currentChapter = null, currentVerse = null;
+    let quill = null;
+
+    function openModal(book_id, chapter, verse) {
+        currentBook = book_id;
+        currentChapter = chapter;
+        currentVerse = verse;
+        document.getElementById('noteModal').style.display = 'flex';
+        if (!quill) {
+            quill = new Quill('#editor-container', {
+                theme: 'snow',
+                modules: {
+                    toolbar: [
+                        [{ 'header': [1, 2, false] }],
+                        ['bold', 'italic', 'underline'],
+                        [{'list': 'ordered'}, {'list': 'bullet'}],
+                        ['clean']
+                    ]
+                }
+            });
         }
-    });
-}
-function cancelEdit(verse) {
-    document.getElementById('note-form-' + verse).style.display = 'none';
-    document.getElementById('note-text-' + verse).style.display = '';
-    document.getElementById('edit-btn-' + verse).style.display = '';
-}
-</script>
+        // Load current note
+        let noteElem = document.getElementById('note-text-' + verse);
+        let html = noteElem ? noteElem.innerHTML : '';
+        quill.root.innerHTML = html;
+    }
+
+    function closeModal() {
+        document.getElementById('noteModal').style.display = 'none';
+    }
+
+    function saveModalNote() {
+        let note = quill.root.innerHTML;
+        fetch("/save_note", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                book_id: currentBook,
+                chapter: currentChapter,
+                verse: currentVerse,
+                note: note
+            })
+        }).then(r => r.json()).then(data => {
+            if (data.success) {
+                document.getElementById('note-text-' + currentVerse).innerHTML = note;
+                closeModal();
+            }
+        });
+    }
+    </script>
 </body>
 </html>
