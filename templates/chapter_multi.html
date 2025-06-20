@@ -1,83 +1,79 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
     <title>{{ book_name }} Chapter {{ chapter_num }}</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 30px; }
-        table { border-collapse: collapse; margin-bottom: 18px; width: 100%; }
-        th, td { border: 1px solid #aaa; padding: 4px 7px; text-align: left; }
-        th { background: #f0f7ff; }
-        tr:nth-child(even) { background: #f9f9f9; }
-        .back { margin-bottom: 20px; }
-        .edit-note-btn { color: #337ab7; cursor: pointer; text-decoration: underline; }
-        .note-form { display: none; }
+        .verse-table { border-collapse: collapse; width: 100%; }
+        .verse-table th, .verse-table td { border: 1px solid #bbb; padding: 6px; }
+        .verse-table th { background: #eee; }
+        .edit-link { color: blue; cursor: pointer; text-decoration: underline; }
     </style>
-    <script>
-        function editNote(verse) {
-            document.getElementById('note-form-' + verse).style.display = '';
-            document.getElementById('note-text-' + verse).style.display = 'none';
-            document.getElementById('edit-btn-' + verse).style.display = 'none';
-        }
-        function saveNote(book_id, chapter, verse) {
-            let noteInput = document.getElementById('note-input-' + verse);
-            fetch("/save_note", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({
-                    book_id: book_id,
-                    chapter: chapter,
-                    verse: verse,
-                    note: noteInput.value
-                })
-            }).then(r => r.json()).then(data => {
-                if (data.success) {
-                    document.getElementById('note-text-' + verse).innerText = noteInput.value;
-                    document.getElementById('note-form-' + verse).style.display = 'none';
-                    document.getElementById('note-text-' + verse).style.display = '';
-                    document.getElementById('edit-btn-' + verse).style.display = '';
-                }
-            });
-        }
-        function cancelEdit(verse) {
+</head>
+<body>
+    <a href="/">&#8592; Back to Books</a>
+    <h2>{{ book_name }} Chapter {{ chapter_num }}</h2>
+    <table class="verse-table">
+        <thead>
+            <tr>
+                <th>Verse</th>
+                {% for v in versions %}
+                <th>{{ v }}</th>
+                {% endfor %}
+                <th>My Note</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in verse_rows %}
+            <tr>
+                <td>{{ row.verse }}</td>
+                {% for v in versions %}
+                <td>{{ row[v] }}</td>
+                {% endfor %}
+                <td>
+                    <span id="note-text-{{ row.verse }}">{{ row.note }}</span>
+                    <span id="edit-btn-{{ row.verse }}" class="edit-link" onclick="editNote({{ row.verse }})">Edit</span>
+                    <span id="note-form-{{ row.verse }}" style="display:none;">
+                        <input type="text" id="note-input-{{ row.verse }}" value="{{ row.note|e }}" size="40">
+                        <button type="button" onclick="saveNote({{ book_id }}, {{ chapter_num }}, {{ row.verse }})">Save</button>
+                        <button type="button" onclick="cancelEdit({{ row.verse }})">Cancel</button>
+                    </span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+<script>
+function editNote(verse) {
+    document.getElementById('note-form-' + verse).style.display = '';
+    document.getElementById('note-text-' + verse).style.display = 'none';
+    document.getElementById('edit-btn-' + verse).style.display = 'none';
+}
+function saveNote(book_id, chapter, verse) {
+    let noteInput = document.getElementById('note-input-' + verse);
+    fetch("/save_note", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            book_id: book_id,
+            chapter: chapter,
+            verse: verse,
+            note: noteInput.value
+        })
+    }).then(r => r.json()).then(data => {
+        if (data.success) {
+            document.getElementById('note-text-' + verse).innerText = noteInput.value;
             document.getElementById('note-form-' + verse).style.display = 'none';
             document.getElementById('note-text-' + verse).style.display = '';
             document.getElementById('edit-btn-' + verse).style.display = '';
         }
-    </script>
-</head>
-<body>
-    <h2>{{ book_name }} Chapter {{ chapter_num }}</h2>
-    <table>
-        <tr>
-            <th>Verse</th>
-            {% for v in versions %}
-                <th>{{ v }}</th>
-            {% endfor %}
-            <th>Note</th>
-        </tr>
-        {% for verse_row in verses_data %}
-        <tr>
-            <td>{{ verse_row.verse }}</td>
-            {% for v in versions %}
-                <td>
-                    {{ verse_row[v] if verse_row[v] else "&mdash;" }}
-                </td>
-            {% endfor %}
-            <td>
-                <span id="note-text-{{ verse_row.verse }}">{{ verse_row.note }}</span>
-                <span id="edit-btn-{{ verse_row.verse }}" class="edit-note-btn" onclick="editNote({{ verse_row.verse }})">Edit</span>
-                <span id="note-form-{{ verse_row.verse }}" class="note-form">
-                    <input type="text" id="note-input-{{ verse_row.verse }}" value="{{ verse_row.note|e }}" size="40">
-                    <button type="button" onclick="saveNote({{ book_id }}, {{ chapter_num }}, {{ verse_row.verse }})">Save</button>
-                    <button type="button" onclick="cancelEdit({{ verse_row.verse }})">Cancel</button>
-                </span>
-            </td>
-        </tr>
-        {% endfor %}
-    </table>
-    <div class="back">
-        <a href="{{ url_for('index', version=versions) }}">&larr; Back to Books/Chapters</a>
-    </div>
+    });
+}
+function cancelEdit(verse) {
+    document.getElementById('note-form-' + verse).style.display = 'none';
+    document.getElementById('note-text-' + verse).style.display = '';
+    document.getElementById('edit-btn-' + verse).style.display = '';
+}
+</script>
 </body>
 </html>

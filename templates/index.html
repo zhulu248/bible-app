@@ -1,65 +1,48 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Bible Books and Chapters</title>
+    <title>Parallel Bible Viewer</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; }
-        .sidebar {
-            position: fixed; left: 0; top: 0; width: 200px; height: 100vh;
-            background: #f7f7f7; border-right: 1px solid #ddd; padding: 15px; overflow-y: auto;
-        }
-        .sidebar strong { display: block; margin-bottom: 10px; }
-        .sidebar a { display: block; color: #003366; text-decoration: none; margin-bottom: 4px; }
-        .sidebar a:hover { background: #d6e9ff; }
-        .main-content { margin-left: 220px; padding: 30px 40px; }
-        h2 { margin-top: 50px; }
-        .chapter-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(36px, 1fr));
-            gap: 6px;
-            margin-bottom: 30px;
-        }
-        .chapter-cell {
-            display: block; padding: 8px 0;
-            text-align: center; background: #eee; border-radius: 4px;
-            color: #333; text-decoration: none; font-weight: bold;
-        }
-        .chapter-cell:hover { background: #9ecfff; color: #00285a; }
-        form.version-selector { margin-bottom: 32px; }
+        .sidebar { float: left; width: 180px; background: #f0f0f0; height: 100vh; padding: 10px; }
+        .content { margin-left: 200px; padding: 10px; }
+        .chapter-grid { display: grid; grid-template-columns: repeat(12, 32px); grid-gap: 4px; }
+        .chapter-cell { background: #eef; border: 1px solid #ccc; text-align: center; padding: 2px 0; }
+        .chapter-cell a { display: block; color: #005; text-decoration: none; }
+        .chapter-cell a:hover { background: #ccf; }
     </style>
 </head>
 <body>
-<div class="sidebar">
-    <strong>Books</strong>
-    {% for book in books %}
-        <a href="#book-{{ book.id }}">{{ book.name }}</a>
-    {% endfor %}
-</div>
-<div class="main-content">
-    <form method="get" class="version-selector">
-        <label><strong>Select up to 2 Versions:</strong></label><br>
-        {% for code, name in available_versions %}
-            <label>
+    <div class="sidebar">
+        <b>Bible Books</b>
+        <ul style="list-style: none; padding: 0;">
+            {% for book in books %}
+            <li><a href="#book-{{ book.id }}">{{ book.name }}</a></li>
+            {% endfor %}
+        </ul>
+    </div>
+    <div class="content">
+        <h2>Choose Bible Versions (up to 2):</h2>
+        <form method="get" action="/">
+            {% for code, name in available_versions %}
                 <input type="checkbox" name="version" value="{{ code }}"
                     {% if code in selected_versions %}checked{% endif %}
-                    {% if selected_versions|length >= 2 and code not in selected_versions %}disabled{% endif %}>
-                {{ name }}
-            </label>
-        {% endfor %}
-        <button type="submit" style="margin-left:20px;">Apply</button>
-    </form>
-    {% for book in books %}
-        <h2 id="book-{{ book.id }}">{{ book.name }}</h2>
-        <div class="chapter-grid">
-            {% for chapter in book.chapters %}
-                <a class="chapter-cell"
-                   href="{{ url_for('show_chapter', book_id=book.id, chapter_num=chapter, **{'version': selected_versions}) }}">
-                    {{ chapter }}
-                </a>
+                    {% if selected_versions|length >= 2 and code not in selected_versions %}disabled{% endif %}
+                >{{ name }}
             {% endfor %}
-        </div>
-    {% endfor %}
-</div>
+            <input type="submit" value="Apply">
+        </form>
+        <hr>
+        {% for book in books %}
+            <h3 id="book-{{ book.id }}">{{ book.name }}</h3>
+            <div class="chapter-grid">
+                {% for ch in book.chapters %}
+                <div class="chapter-cell">
+                    <a href="{{ url_for('show_chapter', book_id=book.id, chapter_num=ch) }}?{% for v in selected_versions %}version={{ v }}&{% endfor %}">{{ ch }}</a>
+                </div>
+                {% endfor %}
+            </div>
+            <br>
+        {% endfor %}
+    </div>
 </body>
 </html>

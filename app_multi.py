@@ -4,10 +4,8 @@ from pathlib import Path
 
 app = Flask(__name__)
 BASE_DIR = Path(__file__).resolve().parent
-DATABASE = BASE_DIR / "KJV.db"
-NOTES_DB = BASE_DIR / "notes.db"
-
-
+DATABASE = BASE_DIR / "kjv.db"
+MY_NOTES_DB = BASE_DIR / "my_note.db"
 
 AVAILABLE_VERSIONS = [
     ("KJV", "King James Version"),
@@ -23,55 +21,70 @@ def get_db():
     return db
 
 def get_notes_db():
-    db = getattr(g, "_notes_db", None)
+    db = getattr(g, "_my_notes_db", None)
     if db is None:
-        db = g._notes_db = sqlite3.connect(NOTES_DB)
+        db = g._my_notes_db = sqlite3.connect(MY_NOTES_DB)
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS notes (
+                book_id INTEGER,
+                chapter INTEGER,
+                verse INTEGER,
+                note TEXT,
+                PRIMARY KEY (book_id, chapter, verse)
+            )
+        """)
+        db.commit()
     return db
 
 @app.teardown_appcontext
 def close_connections(exception):
-    db = getattr(g, "_database", None)
+    db = getattr(g, "_my_notes_db", None)
     if db is not None:
         db.close()
-    notes_db = getattr(g, "_notes_db", None)
-    if notes_db is not None:
-        notes_db.close()
+    db2 = getattr(g, "_database", None)
+    if db2 is not None:
+        db2.close()
 
 @app.route("/", methods=["GET"])
 def index():
     cur = get_db().cursor()
     cur.execute("SELECT id, name FROM KJV_books")
-    books_raw = cur.fetchall()
-
-    # Get chapter count for each book
+    books = cur.fetchall()
     cur.execute("SELECT book_id, MAX(chapter) FROM verses GROUP BY book_id")
     chapter_counts = {book_id: max_chapter for book_id, max_chapter in cur.fetchall()}
 
-    books = []
-    for book_id, name in books_raw:
+    # List of dicts: each book's id, name, and chapters
+    book_objs = []
+    for book_id, name in books:
         chapters = list(range(1, chapter_counts.get(book_id, 0) + 1))
-        books.append({"id": book_id, "name": name, "chapters": chapters})
+        book_objs.append({"id": book_id, "name": name, "chapters": chapters})
 
-    # Get selected versions or default to KJV, CUV_SIM
     selected_versions = request.args.getlist("version")
     if not selected_versions:
         selected_versions = ["KJV", "CUV_SIM"]
 
-    return render_template("index.html",
-                           books=books,
-                           available_versions=AVAILABLE_VERSIONS,
-                           selected_versions=selected_versions)
+    return render_template(
+        "index.html",
+        books=book_objs,
+        available_versions=AVAILABLE_VERSIONS,
+        selected_versions=selected_versions
+    )
 
 @app.route("/book/<int:book_id>/chapter/<int:chapter_num>")
 def show_chapter(book_id, chapter_num):
     cur = get_db().cursor()
     cur.execute("SELECT name FROM KJV_books WHERE id = ?", (book_id,))
-    book_name = cur.fetchone()[0]
+    book_name = cur.fetchone()[0] if cur.rowcount != 0 else "Unknown Book"
 
     versions = request.args.getlist("version")
     if not versions:
         versions = ["KJV", "CUV_SIM"]
 
+    # Gather all verse numbers in this chapter
+    cur.execute("SELECT DISTINCT verse FROM verses WHERE book_id = ? AND chapter = ? ORDER BY verse", (book_id, chapter_num))
+    verse_numbers = [row[0] for row in cur.fetchall()]
+
+    # Get verse texts for each selected version
     version_texts = {}
     for v in versions:
         cur.execute("""
@@ -79,44 +92,42 @@ def show_chapter(book_id, chapter_num):
             WHERE book_id = ? AND chapter = ? AND version = ?
             ORDER BY verse
         """, (book_id, chapter_num, v))
-        version_texts[v] = cur.fetchall()
+        rows = cur.fetchall()
+        # Dictionary: verse_number -> text
+        version_texts[v] = {verse: text for verse, text in rows}
 
-    base_version = "KJV" if "KJV" in version_texts and version_texts["KJV"] else next(iter(version_texts))
-    verse_numbers = [row[0] for row in version_texts[base_version]]
-
-    # Fetch notes for these verses
+    # Get user notes for this chapter
     notes_db = get_notes_db()
-    notes_cur = notes_db.cursor()
-    notes_cur.execute("""
-        SELECT verse, note FROM notes
-        WHERE book_id = ? AND chapter = ?
-    """, (book_id, chapter_num))
-    notes_map = {row[0]: row[1] for row in notes_cur.fetchall()}
+    notes_cursor = notes_db.cursor()
+    notes_cursor.execute(
+        "SELECT verse, note FROM notes WHERE book_id = ? AND chapter = ?", (book_id, chapter_num)
+    )
+    notes = {verse: note for verse, note in notes_cursor.fetchall()}
 
-    verses_data = []
-    for idx, verse_num in enumerate(verse_numbers):
-        verse_row = {"verse": verse_num}
+    # Build verse_row list
+    verse_rows = []
+    for verse in verse_numbers:
+        row = {"verse": verse}
         for v in versions:
-            verse_row[v] = version_texts[v][idx][1] if idx < len(version_texts[v]) else ""
-        verse_row["note"] = notes_map.get(verse_num, "")
-        verses_data.append(verse_row)
+            row[v] = version_texts.get(v, {}).get(verse, "")
+        row["note"] = notes.get(verse, "")
+        verse_rows.append(row)
 
-    version_query = [("version", v) for v in versions]
-
-    return render_template("chapter_multi.html",
-                           book_name=book_name,
-                           chapter_num=chapter_num,
-                           versions=versions,
-                           verses_data=verses_data,
-                           book_id=book_id,
-                           version_query=version_query)
+    return render_template(
+        "chapter_multi.html",
+        book_id=book_id,
+        book_name=book_name,
+        chapter_num=chapter_num,
+        versions=versions,
+        verse_rows=verse_rows
+    )
 
 @app.route("/save_note", methods=["POST"])
 def save_note():
     data = request.get_json()
-    book_id = data["book_id"]
-    chapter = data["chapter"]
-    verse = data["verse"]
+    book_id = int(data["book_id"])
+    chapter = int(data["chapter"])
+    verse = int(data["verse"])
     note = data["note"]
 
     db = get_notes_db()
