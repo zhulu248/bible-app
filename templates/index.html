@@ -22,15 +22,29 @@
     </div>
     <div class="content">
         <h2>Choose Bible Versions (up to 2):</h2>
-        <form method="get" action="/">
+        <form method="get" action="/" id="version-form">
             {% for code, name in available_versions %}
                 <input type="checkbox" name="version" value="{{ code }}"
-                    {% if code in selected_versions %}checked{% endif %}
-                    {% if selected_versions|length >= 2 and code not in selected_versions %}disabled{% endif %}
-                >{{ name }}
+                    {% if code in selected_versions %}checked{% endif %}>
+                {{ name }}
             {% endfor %}
             <input type="submit" value="Apply">
         </form>
+        <script>
+            // Prevent selecting more than 2 versions
+            document.addEventListener('DOMContentLoaded', function() {
+                const checkboxes = document.querySelectorAll('input[type="checkbox"][name="version"]');
+                checkboxes.forEach(cb => {
+                    cb.addEventListener('change', function() {
+                        let checked = document.querySelectorAll('input[type="checkbox"][name="version"]:checked');
+                        if (checked.length > 2) {
+                            this.checked = false;
+                            alert('Please select no more than 2 versions.');
+                        }
+                    });
+                });
+            });
+        </script>
         <hr>
         {% for book in books %}
             <h3 id="book-{{ book.id }}">{{ book.name }}</h3>

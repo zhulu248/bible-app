@@ -53,7 +53,6 @@ def index():
     cur.execute("SELECT book_id, MAX(chapter) FROM verses GROUP BY book_id")
     chapter_counts = {book_id: max_chapter for book_id, max_chapter in cur.fetchall()}
 
-    # List of dicts: each book's id, name, and chapters
     book_objs = []
     for book_id, name in books:
         chapters = list(range(1, chapter_counts.get(book_id, 0) + 1))
@@ -80,11 +79,9 @@ def show_chapter(book_id, chapter_num):
     if not versions:
         versions = ["KJV", "CUV_SIM"]
 
-    # Gather all verse numbers in this chapter
     cur.execute("SELECT DISTINCT verse FROM verses WHERE book_id = ? AND chapter = ? ORDER BY verse", (book_id, chapter_num))
     verse_numbers = [row[0] for row in cur.fetchall()]
 
-    # Get verse texts for each selected version
     version_texts = {}
     for v in versions:
         cur.execute("""
@@ -93,10 +90,8 @@ def show_chapter(book_id, chapter_num):
             ORDER BY verse
         """, (book_id, chapter_num, v))
         rows = cur.fetchall()
-        # Dictionary: verse_number -> text
         version_texts[v] = {verse: text for verse, text in rows}
 
-    # Get user notes for this chapter
     notes_db = get_notes_db()
     notes_cursor = notes_db.cursor()
     notes_cursor.execute(
@@ -104,7 +99,6 @@ def show_chapter(book_id, chapter_num):
     )
     notes = {verse: note for verse, note in notes_cursor.fetchall()}
 
-    # Build verse_row list
     verse_rows = []
     for verse in verse_numbers:
         row = {"verse": verse}
